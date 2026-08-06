@@ -1,0 +1,80 @@
+/*@!Encoding:1252*/
+includes
+{
+
+}
+
+variables
+{
+  /*
+    The watchdog timer that will be reset upon message reception.
+  */
+  msTimer watchdogTimer_Msg100;
+
+  /*
+    State variable to track the status of the message reception.
+    - 1: Message is considered active/OK.
+    - 0: Message has timed out.
+    This prevents repeated timeout messages.
+  */
+  int isMsgOk = 1;
+}
+
+/*
+  This event procedure is called when the measurement starts.
+  It initializes the watchdog.
+*/
+on start
+{
+  write("Watchdog for CAN message 0x100 activated with a 1000ms timeout.");
+
+  // Start the timer. If we don't receive message 0x100 within 1000ms,
+  // the 'on timer' event will trigger.
+  setTimer(watchdogTimer_Msg100, 1000);
+}
+
+/*
+  This event procedure is triggered every time message 0x100 is received.
+  This is the "kick" or "reset" for our watchdog.
+*/
+on message 0x100
+{
+  // If the message was previously in a timeout state, report that it has recovered.
+  if (isMsgOk == 0)
+  {
+    write("OK: Message 0x100 reception has resumed.");
+  }
+
+  // Set the state back to OK.
+  isMsgOk = 1;
+
+  // Reset the timer for another 1000ms. This is the core watchdog logic.
+  setTimer(watchdogTimer_Msg100, 1000);
+}
+
+/*
+  This event procedure is triggered ONLY if 1000ms have passed
+  WITHOUT 'on message 0x100' being called to reset the timer.
+*/
+on timer watchdogTimer_Msg100
+{
+  // Check if the state was previously OK. If so, this is the first
+  // moment of the timeout, so we report it.
+  if (isMsgOk == 1)
+  {
+    write("TIMEOUT: No message 0x100 received in the last 1000ms!");
+  }
+
+  // Set the state to timed out. The timer is now expired and will not
+  // fire again until it is reset by a new 'on message' event.
+  isMsgOk = 0;
+}
+
+/*
+  On measurement stop, it is good practice to cancel any pending timers.
+*/
+on stopMeasurement
+{
+    cancelTimer(watchdogTimer_Msg100);
+    write("Measurement stopped. Watchdog for 0x100 deactivated.");
+}

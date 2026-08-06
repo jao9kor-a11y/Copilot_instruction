@@ -1,0 +1,59 @@
+/*@!Encoding:1252*/
+includes
+{
+
+}
+
+variables
+{
+  /*
+    Declaration of the millisecond timer.
+    This object will manage the 500ms cycle.
+  */
+  msTimer cyclicTimer;
+
+  /*
+    A counter to keep track of how many times the timer has triggered.
+  */
+  long timerEventCount = 0;
+}
+
+/*
+  This event procedure is called once when the measurement starts.
+  It's the ideal place to initialize and start the timer for the first time.
+*/
+on start
+{
+  write("Measurement started. Initializing the 500ms cyclic timer...");
+
+  // Set the timer to trigger for the first time after 500ms.
+  setTimer(cyclicTimer, 500);
+}
+
+/*
+  This event procedure is automatically called every time 'cyclicTimer' expires.
+*/
+on timer cyclicTimer
+{
+  // Increment the event counter
+  timerEventCount++;
+
+  // Print a message to the CANoe/CANalyzer Write window.
+  // The %ld format specifier is used for 'long' integers.
+  write("Timer triggered. This is event number %ld.", timerEventCount);
+
+  // --- This is the most important step for a cyclic timer ---
+  // Reset the timer to trigger again after another 500ms.
+  // If you forget this line, the timer will only run once.
+  setTimer(cyclicTimer, 500);
+}
+
+/*
+    This event procedure is called when the measurement stops.
+    It is good practice to cancel any active timers.
+*/
+on stopMeasurement
+{
+    write("Measurement stopped. Cancelling timer.");
+    cancelTimer(cyclicTimer);
+}

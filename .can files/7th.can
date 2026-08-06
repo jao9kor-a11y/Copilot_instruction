@@ -1,0 +1,42 @@
+/*@!Encoding:1252*/
+includes
+{
+
+}
+
+variables
+{
+  // No global variables are required for this task.
+}
+
+/*
+  This event procedure is called when the measurement starts.
+  It confirms the script is ready to monitor the bus.
+*/
+on start
+{
+  write("CAPL script active. Waiting for message 'EngineData' to read the 'EngineSpeed' signal...");
+}
+
+/*
+  This event procedure is triggered automatically whenever the message
+  symbolically named "EngineData" is received on the bus.
+*/
+on message EngineData
+{
+  double currentSpeed;
+
+  // Access the physical value of the signal using the signal's name.
+  // CAPL automatically uses the database information to find the signal
+  // within the message's data bytes and apply its factor and offset.
+  // The 'this' keyword refers to the received message 'EngineData'.
+  currentSpeed = this.EngineSpeed;
+
+  // You can also use the dollar sign ($) syntax, which is equivalent in this context:
+  // currentSpeed = $EngineSpeed;
+
+  // Print the decoded physical value to the Write window.
+  // '%.0f' formats the value as a floating-point number with zero decimal places.
+  // The unit (rpm, km/h, etc.) is for display purposes and should match the database definition.
+  write("EngineData received: EngineSpeed = %.0f rpm", currentSpeed);
+}
