@@ -1,0 +1,77 @@
+/*@!Encoding:1252*/
+includes
+{
+
+}
+
+variables
+{
+  /*
+    Declaration of the CAN message to be sent.
+    - ID: 0x123
+    - Name: msg_Tx_Example
+  */
+  message 0x123 msg_Tx_Example;
+
+  /*
+    Declaration of a millisecond timer for cyclic sending.
+    - Name: timer_CyclicSend
+  */
+  msTimer timer_CyclicSend;
+
+  /*
+    State variable to control the transmission.
+    - 1: Sending active
+    - 0: Sending inactive
+  */
+  int isSendingActive = 0;
+}
+
+/*
+  This event procedure is called when the measurement starts.
+  It initializes the timer to begin sending the message.
+*/
+on start
+{
+  write("Info: Press 'a' to start or stop sending message 0x123.");
+}
+
+/*
+  This event procedure is triggered when the 'a' key is pressed.
+  It toggles the transmission of the CAN message.
+*/
+on key 'a'
+{
+  isSendingActive = !isSendingActive; // Toggle the sending state
+
+  if (isSendingActive)
+  {
+    // Start the cyclic timer with a 100ms interval
+    setTimer(timer_CyclicSend, 100);
+    write("Started sending message 0x123 cyclically (100ms).");
+  }
+  else
+  {
+    // Stop the timer to halt message transmission
+    cancelTimer(timer_CyclicSend);
+    write("Stopped sending message 0x123.");
+  }
+}
+
+/*
+  This event procedure is called when the 'timer_CyclicSend' timer expires.
+*/
+on timer timer_CyclicSend
+{
+  // Set the payload data for the message (optional)
+  // For this example, we send an 8-byte message with all zeros.
+  msg_Tx_Example.dlc = 8;
+  // msg_Tx_Example.byte(0) = 0x01;
+  // msg_Tx_Example.byte(1) = 0x02;
+
+  // Output the message to the CAN bus
+  output(msg_Tx_Example);
+
+  // Reset the timer for the next cycle
+  setTimer(timer_CyclicSend, 100);
+}
