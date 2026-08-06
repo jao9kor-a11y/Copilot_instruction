@@ -1,0 +1,94 @@
+/*@!Encoding:1252*/
+includes
+{
+
+}
+
+variables
+{
+  /*
+    Declaration for the CAN FD message to be sent.
+    - ID: 0x200
+  */
+  message 0x200 msg_Tx_CAN_FD;
+
+  /*
+    Timer for the 50ms cyclic transmission.
+  */
+  msTimer timer_CyclicSend_FD;
+
+  /*
+    State variable to control the cyclic transmission.
+    - 0: Inactive
+    - 1: Active
+  */
+  int isSendingActive = 0;
+
+  /*
+    A counter to vary the payload data in each cycle.
+  */
+  byte payloadCounter = 0;
+}
+
+/*
+  This event procedure is called when the measurement starts.
+  It provides instructions to the user.
+*/
+on start
+{
+  write("Info: Press 'f' to start or stop sending the CAN FD message 0x200.");
+}
+
+/*
+  This event procedure toggles the message transmission when 'f' is pressed.
+*/
+on key 'f'
+{
+  isSendingActive = !isSendingActive; // Toggle the state
+
+  if (isSendingActive)
+  {
+    // Start the cyclic timer with a 50ms interval.
+    setTimer(timer_CyclicSend_FD, 50);
+    write("Started sending CAN FD message 0x200 (64 bytes) every 50ms.");
+  }
+  else
+  {
+    // Stop the timer to halt transmission.
+    cancelTimer(timer_CyclicSend_FD);
+    write("Stopped sending CAN FD message 0x200.");
+  }
+}
+
+/*
+  This event procedure is triggered every time the timer expires.
+*/
+on timer timer_CyclicSend_FD
+{
+  int i; // Loop counter
+
+  // --- Set CAN FD Specific Properties ---
+  // 1. Enable FD Format (required for CAN FD frames)
+  msg_Tx_CAN_FD.FDF = 1;
+
+  // 2. Enable Bit Rate Switch (optional, but typical for performance)
+  msg_Tx_CAN_FD.BRS = 1;
+
+  // 3. Set the Data Length Code (DLC) for 64 bytes.
+  // In CAN FD, a DLC of 15 corresponds to a 64-byte payload.
+  msg_Tx_CAN_FD.dlc = 15;
+
+  // --- Populate the 64-byte payload ---
+  // This example fills the payload with an incrementing pattern.
+  for (i = 0; i < 64; i++)
+  {
+    msg_Tx_CAN_FD.byte(i) = payloadCounter + i;
+  }
+  payloadCounter++; // Increment the base value for the next message
+
+  // Transmit the CAN FD message on the bus
+  output(msg_Tx_CAN_FD);
+
+  // Reset the timer for the next 50ms cycle
+  setTimer(timer_CyclicSend_FD, 50);
+}
