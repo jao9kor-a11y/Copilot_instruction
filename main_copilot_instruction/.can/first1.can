@@ -1,0 +1,201 @@
+/*@!Encoding:1252*/
+/*==============================================================================
+  CAPL Script: TC_NoFalseAccessAttempts_NoBlockTime
+  Requirement ID: 2700204
+  Function ID: EDI_FNID_1282
+
+  Purpose:
+  Verify that with 0 false access attempts, no block time is triggered
+  and block time duration remains 0.
+
+  Preconditions:
+  - ECU powered ON
+  - Diagnostic tool connected
+  - Physical addressing configured
+  - Communication interface functional
+  
+  
+  1. Establish Default Session
+**Request data:** [0x10 0x01]
+**Response data:** [0x50 0x01]
+
+2. Send ReadDataByIdentifier request for Block Time Status DID (example DID 0xF1A0) to verify no block time is triggered and duration is zero
+**Request data:** [0x22 0xF1 0xA0]
+**Response data:** [0x62 0xF1 0xA0 0x00 0x00]
+*Note: Response bytes indicate Block Time Triggered = 0x00 (No), Block Time Duration = 0x00 (0 seconds)*
+
+3. Wait arbitrary time period (e.g., 60 seconds) to simulate any time since last false attempt
+
+4. Repeat ReadDataByIdentifier request for Block Time Status DID to confirm no change
+**Request data:** [0x22 0xF1 0xA0]
+**Response data:** [0x62 0xF1 0xA0 0x00 0x00]
+*Note: Block Time Triggered remains 0x00 and Block Time Duration remains 0x00*
+==============================================================================*/
+
+includes
+{
+}
+
+variables
+{
+  int testPassed = 1;
+  int testStep = 1;
+  msTimer testTimer;
+}
+
+/* Send UDS Request */
+void SendUDSRequest(byte b0, byte b1, byte b2, byte b3,
+                    byte b4, byte b5, byte b6, byte b7,
+                    int dlc)
+{
+  message 0x740 msg;
+
+  msg.byte(0) = b0;
+  msg.byte(1) = b1;
+  msg.byte(2) = b2;
+  msg.byte(3) = b3;
+  msg.byte(4) = b4;
+  msg.byte(5) = b5;
+  msg.byte(6) = b6;
+  msg.byte(7) = b7;
+
+  msg.dlc = dlc;
+
+  output(msg);
+
+  write("Tx: %02X %02X %02X %02X %02X %02X %02X %02X",
+        b0,b1,b2,b3,b4,b5,b6,b7);
+}
+
+on start
+{
+  write("=================================================");
+  write("TC_NoFalseAccessAttempts_NoBlockTime");
+  write("Requirement ID : 2700204");
+  write("Press 't' to start test");
+  write("=================================================");
+}
+
+on key 't'
+{
+  write("Test Started");
+
+  testPassed = 1;
+  testStep = 1;
+
+  /* Step 1 - Establish Default Session */
+  write("Step 1 : Establish Default Session");
+
+  SendUDSRequest(
+      0x10,0x01,0x00,0x00,
+      0x00,0x00,0x00,0x00,
+      2);
+}
+
+on timer testTimer
+{
+  if(testStep == 3)
+  {
+    write("Step 3 : Wait 60 seconds completed");
+
+    SendUDSRequest(
+        0x22,0xF1,0xA0,0x00,
+        0x00,0x00,0x00,0x00,
+        3);
+
+    testStep = 4;
+  }
+  else if(testStep == 5)
+  {
+    write("=================================================");
+
+    if(testPassed)
+    {
+      write("TEST RESULT : PASS");
+    }
+    else
+    {
+      write("TEST RESULT : FAIL");
+    }
+
+    write("=================================================");
+  }
+}
+
+on message 0x748
+{
+  write("Rx: %02X %02X %02X %02X %02X %02X %02X %02X",
+        this.byte(0),
+        this.byte(1),
+        this.byte(2),
+        this.byte(3),
+        this.byte(4),
+        this.byte(5),
+        this.byte(6),
+        this.byte(7));
+
+  /* Positive Response for Default Session */
+  if(this.byte(0) == 0x50 &&
+     this.byte(1) == 0x01)
+  {
+    write("Default Session Established");
+
+    testStep = 2;
+
+    /* Step 2 - Read Block Time Status DID */
+    write("Step 2 : Read DID F1A0");
+
+    SendUDSRequest(
+        0x22,0xF1,0xA0,0x00,
+        0x00,0x00,0x00,0x00,
+        3);
+  }
+
+  /* DID Response */
+  else if(this.byte(0) == 0x62 &&
+          this.byte(1) == 0xF1 &&
+          this.byte(2) == 0xA0)
+  {
+    if(testStep == 2)
+    {
+      if(this.byte(3) == 0x00 &&
+         this.byte(4) == 0x00)
+      {
+        write("PASS : Block Time Triggered = No");
+        write("PASS : Block Time Duration = 0");
+      }
+      else
+      {
+        write("FAIL : Unexpected Block Time Status");
+        testPassed = 0;
+      }
+
+      write("Waiting 60 seconds...");
+      testStep = 3;
+      setTimer(testTimer,60000);
+    }
+    else if(testStep == 4)
+    {
+      if(this.byte(3) == 0x00 &&
+         this.byte(4) == 0x00)
+      {
+        write("PASS : No change after wait period");
+      }
+      else
+      {
+        write("FAIL : Status changed unexpectedly");
+        testPassed = 0;
+      }
+
+      testStep = 5;
+      setTimer(testTimer,100);
+    }
+  }
+
+  /* Negative Response */
+  else if(this.byte(0) == 0x7F)
+  {
+    write("FAIL : NRC = %02X", this.byte(2));
+    testPassed = 0;
+  }
+}
